@@ -42,3 +42,4 @@ class HandshakePacket(UncompressedPacket):
         next_state, n = VarInt.read(self.data[index:])
         index += n
         self.next_state = State(next_state)
+

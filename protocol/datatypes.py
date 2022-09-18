@@ -23,7 +23,12 @@ class VarInt:
         value = 0
         bit_pos = 0
         bytes_read = 0
-        for byte in raw_data:
+        i = 0
+        while True:
+            try:
+                byte = raw_data[i]
+            except IndexError:
+                raise ValueError("VarInt longer than buffer")
             bytes_read += 1
             value |= (byte & cls.SEGMENT_BITS) << bit_pos
             if (byte & cls.CONTINUE_BIT) == 0:
@@ -32,6 +37,7 @@ class VarInt:
 
             if bit_pos >= 32:
                 raise ValueError("VarInt is too big")
+            i += 1
         return value, bytes_read
 
     @classmethod
