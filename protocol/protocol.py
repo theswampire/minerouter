@@ -126,3 +126,6 @@ class Protocol:
     def process_server_events(self, mask):
         self.server_messenger.process_events(mask)
 
+    def process_protocol(self):
+        pass
+
