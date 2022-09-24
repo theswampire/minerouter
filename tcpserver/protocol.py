@@ -1,4 +1,4 @@
-import errno
+import uuid
 import selectors
 import socket
 import time
@@ -39,9 +39,11 @@ class Messenger:
         except BlockingIOError:
             # Resource temporarily unavailable
             pass
+        except OSError:
+            # Resource temporarily unavailable
+            pass
         else:
             if data:
-                print("Read Data")
                 self._recv_buffer += data
                 # self._last_read = current_time
             else:
@@ -55,8 +57,10 @@ class Messenger:
             except BlockingIOError:
                 # Resource temporarily unavailable
                 pass
+            except OSError:
+                # Resource temporarily unavailable
+                pass
             else:
-                print("Wrote Data")
                 self._send_buffer = self._send_buffer[bytes_sent:]
 
     def _read_header(self):
@@ -116,6 +120,7 @@ class CompressedMessenger(Messenger):
 
 
 class Protocol:
+    id: uuid.UUID
     isCompressed: bool = False
     state: State = State.HANDSHAKING
 
@@ -125,6 +130,8 @@ class Protocol:
     selector: selectors.DefaultSelector
 
     def __init__(self, client: socket.socket, addr: Tuple[str, int], selector: selectors.DefaultSelector):
+        self.id = uuid.uuid1()
+        print(f"New Protocol Bridge: {self.id}")
         self.selector = selector
         self.client_messenger = Messenger(sock=client, addr=addr, selector=selector)
 
@@ -171,7 +178,7 @@ class Protocol:
         if addr is None:
             raise ValueError(f"{host} is not configured")
 
-        print(f"Creating Upstream Connection to {addr=} for {host=}")
+        print(f"Creating Upstream Connection to {addr=} for {host=} in {self.id}")
 
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         sock.setblocking(False)
@@ -186,23 +193,29 @@ class Protocol:
         self.server_messenger = Messenger(sock=sock, addr=addr, selector=self.selector)
 
     def pipe_to_client(self, data: bytes):
-        print("Pipe to Client")
         self.client_messenger.write_packet(data)
 
     def pipe_to_server(self, data: bytes):
-        print("Pipe to Server")
         self.server_messenger.write_packet(data)
 
     def handle_passthrough(self):
-        client_packet = self.client_messenger.read_packet()
-        if client_packet is not None:
-            self.pipe_to_server(client_packet)
+        # client_packet = self.client_messenger.read_packet()
+        # if client_packet is not None:
+        #     self.pipe_to_server(client_packet)
+        #
+        # server_packet = self.server_messenger.read_packet()
+        # if server_packet is not None:
+        #     self.pipe_to_client(server_packet)
+        if self.client_messenger._recv_buffer:
+            self.pipe_to_server(self.client_messenger._recv_buffer)
+            self.client_messenger._recv_buffer = b""
 
-        server_packet = self.server_messenger.read_packet()
-        if server_packet is not None:
-            self.pipe_to_client(server_packet)
+        if self.server_messenger._recv_buffer:
+            self.pipe_to_client(self.server_messenger._recv_buffer)
+            self.server_messenger._recv_buffer = b""
 
     def close(self):
+        print(f"Closing Protocol Bridge {self.id}")
         self.client_messenger.close()
         if hasattr(self, "server_messenger"):
             self.server_messenger.close()

@@ -110,7 +110,7 @@ class MineRouterServer2:
     def serve_forever(self):
         signal_handler = SignalHandler()
         while not signal_handler.terminate:
-            events = self.selector.select(timeout=None)
+            events = self.selector.select(timeout=0)
             # Iterate through sockets that are ready to either read or write or both
             for key, mask in events:
                 # data=None is only the main socket
