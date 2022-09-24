@@ -1,14 +1,15 @@
+import errno
 import selectors
 import socket
-
-from .state import State
-from typing import Literal, Tuple
 import time
-from .datatypes import VarInt
+from types import SimpleNamespace
+from typing import Tuple
+
+from protocol import State, VarInt, HandshakePacket
+from utils.config import Config
 
 
 class Messenger:
-    target: Literal["client", "server"]
     sock: socket.socket
     addr: Tuple[str, int]
     selector: selectors.DefaultSelector
@@ -40,6 +41,7 @@ class Messenger:
             pass
         else:
             if data:
+                print("Read Data")
                 self._recv_buffer += data
                 # self._last_read = current_time
             else:
@@ -54,6 +56,7 @@ class Messenger:
                 # Resource temporarily unavailable
                 pass
             else:
+                print("Wrote Data")
                 self._send_buffer = self._send_buffer[bytes_sent:]
 
     def _read_header(self):
@@ -72,8 +75,8 @@ class Messenger:
             return False
 
     def read(self):
-        if self.packet_read_complete:
-            return
+        # if self.packet_read_complete:
+        #     return
 
         self._read()
         if self.packet_length is None:
@@ -102,6 +105,11 @@ class Messenger:
         if mask & selectors.EVENT_WRITE:
             self.write()
 
+    def close(self):
+        self.selector.unregister(self.sock)
+        if self.sock:
+            self.sock.close()
+
 
 class CompressedMessenger(Messenger):
     pass
@@ -121,11 +129,80 @@ class Protocol:
         self.client_messenger = Messenger(sock=client, addr=addr, selector=selector)
 
     def process_client_events(self, mask):
-        self.client_messenger.process_events(mask)
+        try:
+            self.client_messenger.process_events(mask)
+        except RuntimeError as e:
+            if str(e) == "Peer closed.":
+                self.close()
+                return
+            raise
 
     def process_server_events(self, mask):
-        self.server_messenger.process_events(mask)
+        try:
+            self.server_messenger.process_events(mask)
+        except RuntimeError as e:
+            if str(e) == "Peer closed.":
+                self.close()
+                return
+            raise
 
     def process_protocol(self):
-        pass
+        match self.state:
+            case State.HANDSHAKING:
+                self.handle_handshake()
+            case _:
+                self.handle_passthrough()
 
+    def handle_handshake(self):
+        packet = self.client_messenger.read_packet()
+        if packet is None:
+            return
+
+        decoded_packet = HandshakePacket(packet)
+        print(decoded_packet)
+
+        self.create_server_connection(host=decoded_packet.server_addr)
+        self.pipe_to_server(packet)
+
+        self.state = decoded_packet.next_state
+
+    def create_server_connection(self, host: str):
+        addr = Config.get(host, None)
+        if addr is None:
+            raise ValueError(f"{host} is not configured")
+
+        print(f"Creating Upstream Connection to {addr=} for {host=}")
+
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.setblocking(False)
+        code = sock.connect_ex(addr)
+
+        # print(errno.errorcode[code])
+
+        data = SimpleNamespace(target="server", proto=self)
+        events = selectors.EVENT_READ | selectors.EVENT_WRITE
+        self.selector.register(fileobj=sock, events=events, data=data)
+
+        self.server_messenger = Messenger(sock=sock, addr=addr, selector=self.selector)
+
+    def pipe_to_client(self, data: bytes):
+        print("Pipe to Client")
+        self.client_messenger.write_packet(data)
+
+    def pipe_to_server(self, data: bytes):
+        print("Pipe to Server")
+        self.server_messenger.write_packet(data)
+
+    def handle_passthrough(self):
+        client_packet = self.client_messenger.read_packet()
+        if client_packet is not None:
+            self.pipe_to_server(client_packet)
+
+        server_packet = self.server_messenger.read_packet()
+        if server_packet is not None:
+            self.pipe_to_client(server_packet)
+
+    def close(self):
+        self.client_messenger.close()
+        if hasattr(self, "server_messenger"):
+            self.server_messenger.close()

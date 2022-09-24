@@ -43,3 +43,9 @@ class HandshakePacket(UncompressedPacket):
         index += n
         self.next_state = State(next_state)
 
+    def __str__(self):
+        return f"Handshake({self.protocol_version=}, {self.server_addr=}, {self.server_port=}, {self.next_state=})"
+
+    def __repr__(self):
+        return self.__str__()
+

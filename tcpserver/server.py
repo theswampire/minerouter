@@ -1,11 +1,12 @@
-import socket
 import selectors
+import socket
 import types
 from types import SimpleNamespace
-from .tcphandler import ReverseProxyHandler
+from typing import Any, Dict, Tuple
+
 from utils import SignalHandler
-from typing import Any, Literal
-from protocol import Protocol
+from .protocol import Protocol
+from .tcphandler import ReverseProxyHandler
 
 HOST = "127.0.0.1"
 PORT = 25565
@@ -77,6 +78,7 @@ class MineRouterServer:
 
     def close(self):
         self.lsock.close()
+        raise KeyboardInterrupt
 
 
 class MineRouterServer2:
@@ -147,9 +149,9 @@ class MineRouterServer2:
 
         if self.selector:
             # TODO: Check if necessary
-            sock: socket.socket
-            for sock in self.selector.get_map().keys():
-                sock.close()
+            # sock: socket.socket
+            # for sock in self.selector.get_map().keys():
+            #     socket.fromfd(sock, socket.AF_INET, socket.SOCK_STREAM).close()
 
             self.selector.close()
 
