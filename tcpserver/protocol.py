@@ -131,7 +131,7 @@ class Protocol:
 
     def __init__(self, client: socket.socket, addr: Tuple[str, int], selector: selectors.DefaultSelector):
         self.id = uuid.uuid1()
-        print(f"New Protocol Bridge: {self.id}")
+        print(f"New Protocol Bridge: {self.id} for {addr=}")
         self.selector = selector
         self.client_messenger = Messenger(sock=client, addr=addr, selector=selector)
 
@@ -166,7 +166,7 @@ class Protocol:
             return
 
         decoded_packet = HandshakePacket(packet)
-        print(decoded_packet)
+        print(f"{self.id}: {decoded_packet}")
 
         self.create_server_connection(host=decoded_packet.server_addr)
         self.pipe_to_server(packet)
@@ -178,13 +178,11 @@ class Protocol:
         if addr is None:
             raise ValueError(f"{host} is not configured")
 
-        print(f"Creating Upstream Connection to {addr=} for {host=} in {self.id}")
+        print(f"{self.id}: Creating Upstream Connection to {addr=} for {host=}")
 
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         sock.setblocking(False)
         code = sock.connect_ex(addr)
-
-        # print(errno.errorcode[code])
 
         data = SimpleNamespace(target="server", proto=self)
         events = selectors.EVENT_READ | selectors.EVENT_WRITE
@@ -215,7 +213,7 @@ class Protocol:
             self.server_messenger._recv_buffer = b""
 
     def close(self):
-        print(f"Closing Protocol Bridge {self.id}")
+        print(f"{self.id}: Closing Protocol Bridge")
         self.client_messenger.close()
         if hasattr(self, "server_messenger"):
             self.server_messenger.close()

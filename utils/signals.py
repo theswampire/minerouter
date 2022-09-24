@@ -8,6 +8,7 @@ class SignalHandler:
         signal.signal(signal.SIGINT, self.exit_gracefully)
         signal.signal(signal.SIGTERM, self.exit_gracefully)
 
+    # noinspection PyUnusedLocal
     def exit_gracefully(self, *args):
         self.terminate = True
         print("Terminating server...")

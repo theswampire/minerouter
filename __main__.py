@@ -1,7 +1,7 @@
-from tcpserver.server import MineRouterServer2
+from tcpserver.server import MineRouterServer
 from utils.config import Config
 
-HOST, PORT = "127.0.0.1", 25565
+HOST, PORT = "0.0.0.0", 25565
 
 
 def main():
@@ -10,7 +10,7 @@ def main():
         "localhost": ("127.0.0.1", 25570),
     })
 
-    with MineRouterServer2(HOST, PORT) as mc:
+    with MineRouterServer(HOST, PORT) as mc:
         mc.serve_forever()
 
 

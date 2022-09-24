@@ -63,8 +63,6 @@ class UnsignedShort:
 
 
 if __name__ == '__main__':
-    # print(VarInt.read(b'\x10\x00\xf8\x05\tlocalhostc\xdd\x01'))
-
     print(VarInt.read(b'c\xdd\x01'))
     print(UnsignedShort(b'c\xdd\x01'))
     hexlist = [hex(b)[2:] for b in b'c\xdd\x01']
