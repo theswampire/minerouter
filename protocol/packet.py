@@ -31,7 +31,7 @@ class HandshakePacket(UncompressedPacket):
         self.protocol_version, n = VarInt.new(self.data)
         index += n
 
-        string_length, n = VarInt.read(self.data[index:])
+        string_length, n = VarInt.decode(self.data[index:])
         index += n
         self.server_addr = self.data[index:index + string_length].decode("UTF-8")
         index += string_length
@@ -39,7 +39,7 @@ class HandshakePacket(UncompressedPacket):
         self.server_port = UnsignedShort(self.data[index:])
         index += 2
 
-        next_state, n = VarInt.read(self.data[index:])
+        next_state, n = VarInt.decode(self.data[index:])
         index += n
         self.next_state = State(next_state)
 
@@ -48,3 +48,7 @@ class HandshakePacket(UncompressedPacket):
 
     def __repr__(self):
         return self.__str__()
+
+
+class DisconnectLoginPacket(UncompressedPacket):
+    ...

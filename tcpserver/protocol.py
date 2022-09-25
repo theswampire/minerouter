@@ -63,7 +63,7 @@ class Messenger:
     def _read_header(self):
         if len(self.recv_buffer) > 0:
             try:
-                value, n = VarInt.read(self.recv_buffer)
+                value, n = VarInt.decode(self.recv_buffer)
             except ValueError:
                 return
             else:
