@@ -1,4 +1,4 @@
-from typing import Dict, Tuple, Any
+from typing import Dict, Tuple, Any, TypedDict
 
 
 class Singleton:
@@ -10,15 +10,25 @@ class Singleton:
         return cls.instance
 
 
-class Config(Singleton):
-    config: Dict[str, Tuple[str, int]] | None = None
+class ConfigData(TypedDict):
+    upstream_config: Dict[str, Tuple[str, int]]
+    system_config: Dict[str, Any]
 
-    def __init__(self, config: Dict[str, Tuple[str, int]]):
+
+class Config(Singleton):
+    config: ConfigData | None = None
+
+    def __init__(self, config: ConfigData):
         Config.config = config
 
     @classmethod
-    def get(cls, *args, **kwargs) -> Any:
+    def get_addr(cls, *args, **kwargs) -> Any:
         if cls.config is None:
             raise ValueError("Config not initialized")
+        return cls.config["upstream_config"].get(*args, **kwargs)
 
-        return cls.config.get(*args, **kwargs)
+    @classmethod
+    def get_system_conf(cls, *args, **kwargs) -> Any:
+        if cls.config is None:
+            raise ValueError("Config is not initialized")
+        return cls.config['system_config'].get(*args, **kwargs)

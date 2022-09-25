@@ -5,6 +5,9 @@ from typing import Any
 
 from utils.signals import SignalHandler
 from .protocol import Protocol
+from utils.logs import get_logger
+
+log = get_logger(__name__)
 
 
 class MineRouterServer:
@@ -21,7 +24,7 @@ class MineRouterServer:
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.sock.bind((host, port))
         self.sock.listen()
-        print(f"Listening on {host=}, {port=}")
+        log.info(f"Listening on {host=}, {port=}")
         self.sock.setblocking(False)
 
         self.selector = selectors.DefaultSelector()
@@ -48,7 +51,7 @@ class MineRouterServer:
 
     def accept_connection(self, sock: socket.socket | Any):
         conn, addr = sock.accept()
-        print(f"Accepted connection from {addr}")
+        log.debug(f"Accepted connection from {addr}")
         conn.setblocking(False)
 
         proto = Protocol(client=conn, addr=addr, selector=self.selector)
@@ -69,6 +72,7 @@ class MineRouterServer:
         proto.process_protocol()
 
     def close(self):
+        log.info("Terminating server...")
         if self.sock:
             self.sock.close()
 

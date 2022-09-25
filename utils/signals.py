@@ -1,4 +1,7 @@
 import signal
+from .logs import get_logger
+
+log = get_logger(__name__)
 
 
 class SignalHandler:
@@ -10,5 +13,5 @@ class SignalHandler:
 
     # noinspection PyUnusedLocal
     def exit_gracefully(self, *args):
+        log.debug("Exit Signal Captured")
         self.terminate = True
-        print("Terminating server...")

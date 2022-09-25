@@ -7,6 +7,9 @@ from typing import Tuple
 
 from protocol import State, VarInt, HandshakePacket
 from utils.config import Config
+from utils.logs import get_logger
+
+log = get_logger(__name__)
 
 
 class Messenger:
@@ -17,10 +20,10 @@ class Messenger:
     _recv_buffer: bytes = b""
     _send_buffer: bytes = b""
 
-    # _last_read: float
-
     packet_length: int | None = None
     packet_read_complete: bool = False
+
+    use_complete_packets: bool = False
 
     def __init__(self, sock: socket.socket, selector: selectors.DefaultSelector, addr: Tuple[str, int]):
         self._last_read = time.time()
@@ -30,22 +33,18 @@ class Messenger:
         self.addr = addr
 
     def _read(self):
-        # current_time = time.time()
-        # if current_time - self._last_read > 30:
-        #     raise TimeoutError("The client was inactive for over 30s")
         try:
             # Should be ready to read
             data = self.sock.recv(4096)
         except BlockingIOError:
             # Resource temporarily unavailable
             pass
-        except OSError:
-            # Resource temporarily unavailable
-            pass
+        # except OSError:
+        #     # Resource temporarily unavailable
+        #     pass
         else:
             if data:
                 self._recv_buffer += data
-                # self._last_read = current_time
             else:
                 raise RuntimeError("Peer closed.")
 
@@ -57,9 +56,9 @@ class Messenger:
             except BlockingIOError:
                 # Resource temporarily unavailable
                 pass
-            except OSError:
-                # Resource temporarily unavailable
-                pass
+            # except OSError:
+            #     # Resource temporarily unavailable
+            #     pass
             else:
                 self._send_buffer = self._send_buffer[bytes_sent:]
 
@@ -73,19 +72,20 @@ class Messenger:
                 self.packet_length = value + n
 
     def _check_read_complete(self):
-        if len(self._recv_buffer) > self.packet_length:
+        if len(self._recv_buffer) >= self.packet_length:
             return True
         else:
             return False
 
     def read(self):
-        # if self.packet_read_complete:
-        #     return
-
         self._read()
+
+        if self.packet_read_complete:# or not self.use_complete_packets:
+            return
         if self.packet_length is None:
             self._read_header()
         if self.packet_length is not None:
+            # print(f"{self.packet_length=}")
             self.packet_read_complete = self._check_read_complete()
 
     def write(self):
@@ -129,11 +129,15 @@ class Protocol:
 
     selector: selectors.DefaultSelector
 
+    use_read_packets: bool = False
+
     def __init__(self, client: socket.socket, addr: Tuple[str, int], selector: selectors.DefaultSelector):
         self.id = uuid.uuid1()
-        print(f"New Protocol Bridge: {self.id} for {addr=}")
+        log.debug(f"New Protocol Bridge: {self.id} for {addr=}")
         self.selector = selector
         self.client_messenger = Messenger(sock=client, addr=addr, selector=selector)
+
+        self.set_packet_config()
 
     def process_client_events(self, mask):
         try:
@@ -166,19 +170,20 @@ class Protocol:
             return
 
         decoded_packet = HandshakePacket(packet)
-        print(f"{self.id}: {decoded_packet}")
+        log.debug(f"{self.id}: {decoded_packet}")
 
         self.create_server_connection(host=decoded_packet.server_addr)
+        self.set_packet_config()
         self.pipe_to_server(packet)
 
         self.state = decoded_packet.next_state
 
     def create_server_connection(self, host: str):
-        addr = Config.get(host, None)
+        addr = Config.get_addr(host, None)
         if addr is None:
             raise ValueError(f"{host} is not configured")
 
-        print(f"{self.id}: Creating Upstream Connection to {addr=} for {host=}")
+        log.debug(f"{self.id}: Creating Upstream Connection to {addr=} for {host=}")
 
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         sock.setblocking(False)
@@ -197,13 +202,9 @@ class Protocol:
         self.server_messenger.write_packet(data)
 
     def handle_passthrough(self):
-        # client_packet = self.client_messenger.read_packet()
-        # if client_packet is not None:
-        #     self.pipe_to_server(client_packet)
-        #
-        # server_packet = self.server_messenger.read_packet()
-        # if server_packet is not None:
-        #     self.pipe_to_client(server_packet)
+        ...
+
+    def _passthrough_direct(self):
         if self.client_messenger._recv_buffer:
             self.pipe_to_server(self.client_messenger._recv_buffer)
             self.client_messenger._recv_buffer = b""
@@ -212,8 +213,28 @@ class Protocol:
             self.pipe_to_client(self.server_messenger._recv_buffer)
             self.server_messenger._recv_buffer = b""
 
+    def _passthrough_complete_packets(self):
+        client_packet = self.client_messenger.read_packet()
+        if client_packet is not None:
+            self.pipe_to_server(client_packet)
+
+        server_packet = self.server_messenger.read_packet()
+        if server_packet is not None:
+            self.pipe_to_client(server_packet)
+
+    def set_packet_config(self):
+        self.use_read_packets = Config.get_system_conf("COMPLETE_PACKETS", False)
+        if self.use_read_packets:
+            self.handle_passthrough = self._passthrough_complete_packets
+        else:
+            self.handle_passthrough = self._passthrough_direct
+
+        if self.state is not State.HANDSHAKING:
+            self.client_messenger.use_complete_packets = self.use_read_packets
+            self.server_messenger.use_complete_packets = self.use_read_packets
+
     def close(self):
-        print(f"{self.id}: Closing Protocol Bridge")
+        log.debug(f"{self.id}: Closing Protocol Bridge")
         self.client_messenger.close()
         if hasattr(self, "server_messenger"):
             self.server_messenger.close()
