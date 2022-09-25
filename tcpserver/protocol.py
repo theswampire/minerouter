@@ -119,6 +119,7 @@ class Protocol:
     id: uuid.UUID
     isCompressed: bool = False
     state: State = State.HANDSHAKING
+    server_name: str | None = None
 
     client_messenger: Messenger
     server_messenger: Messenger
@@ -140,19 +141,26 @@ class Protocol:
             self.handle_passthrough = self._passthrough_direct
 
     def process_client_events(self, mask):
+        self._process_events(mask, self.client_messenger)
+
+    def process_server_events(self, mask):
+        self._process_events(mask, self.server_messenger)
+
+    def _process_events(self, mask: int, messenger: Messenger):
         try:
-            self.client_messenger.process_events(mask)
+            messenger.process_events(mask)
         except RuntimeError as e:
             if str(e) == "Peer closed.":
                 self.close()
                 return
             raise
-
-    def process_server_events(self, mask):
-        try:
-            self.server_messenger.process_events(mask)
-        except RuntimeError as e:
-            if str(e) == "Peer closed.":
+        except ConnectionError:
+            log.warning(f"Server Down: {self.server_name} {messenger.addr}")
+            self.close()
+        except OSError as e:
+            # [WinError 10057]
+            if e.winerror == 10057:
+                log.warning(f"Server Down: {self.server_name} {messenger.addr}")
                 self.close()
                 return
             raise
@@ -178,6 +186,7 @@ class Protocol:
         self.state = decoded_packet.next_state
 
     def create_server_connection(self, host: str):
+        self.server_name = host
         addr = Config.get_addr(host, None)
         if addr is None:
             raise ValueError(f"{host} is not configured")
