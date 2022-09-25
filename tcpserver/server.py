@@ -3,9 +3,9 @@ import socket
 from types import SimpleNamespace
 from typing import Any
 
+from utils.logs import get_logger
 from utils.signals import SignalHandler
 from .protocol import Protocol
-from utils.logs import get_logger
 
 log = get_logger(__name__)
 

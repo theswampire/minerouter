@@ -33,7 +33,7 @@ class HandshakePacket(UncompressedPacket):
 
         string_length, n = VarInt.read(self.data[index:])
         index += n
-        self.server_addr = self.data[index:index+string_length].decode("UTF-8")
+        self.server_addr = self.data[index:index + string_length].decode("UTF-8")
         index += string_length
 
         self.server_port = UnsignedShort(self.data[index:])
@@ -48,4 +48,3 @@ class HandshakePacket(UncompressedPacket):
 
     def __repr__(self):
         return self.__str__()
-
