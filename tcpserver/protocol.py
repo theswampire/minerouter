@@ -5,7 +5,7 @@ import uuid
 from types import SimpleNamespace
 from typing import Tuple
 
-from protocol import State, VarInt, HandshakePacket
+from protocol import State, VarInt, HandshakePacket, DisconnectPacket
 from utils.config import Config
 from utils.logs import get_logger
 
@@ -156,13 +156,20 @@ class Protocol:
             raise
         except ConnectionError:
             log.warning(f"Server Down: {self.server_name} {messenger.addr}")
+            # self.notify_server_down()
             self.close()
         except OSError as e:
-            # [WinError 10057]
-            if e.winerror == 10057:
-                log.warning(f"Server Down: {self.server_name} {messenger.addr}")
-                self.close()
-                return
+            match e.winerror:
+                case 10057:
+                    # [WinError 10057]
+                    # if e.winerror == 10057:
+                    log.warning(f"Server Down: {self.server_name} {messenger.addr}")
+                    # self.notify_server_down()
+                    self.close()
+                    return
+                case 10038:
+                    # [WinError 10038]
+                    return
             raise
 
     def process_protocol(self):
@@ -177,7 +184,7 @@ class Protocol:
         if packet is None:
             return
 
-        decoded_packet = HandshakePacket(packet)
+        decoded_packet = HandshakePacket.new(packet)
         log.debug(f"{self.id}: {decoded_packet}")
 
         self.create_server_connection(host=decoded_packet.server_addr)
@@ -210,7 +217,7 @@ class Protocol:
         self.server_messenger.write_packet(data)
 
     def handle_passthrough(self):
-        return
+        ...
 
     def _passthrough_direct(self):
         if self.client_messenger.recv_buffer:
@@ -229,6 +236,12 @@ class Protocol:
         server_packet = self.server_messenger.read_packet()
         if server_packet is not None:
             self.pipe_to_client(server_packet)
+
+    def notify_server_down(self):
+        if self.state is State.LOGIN or self.state is State.PLAY:
+            disconnect_packet = DisconnectPacket.construct(self.state)
+            print(disconnect_packet)
+            self.pipe_to_client(disconnect_packet.dump())
 
     def close(self):
         log.debug(f"{self.id}: Closing Protocol Bridge")
