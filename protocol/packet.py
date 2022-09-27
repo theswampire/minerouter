@@ -1,9 +1,9 @@
+import json
 from dataclasses import dataclass
+from typing import Literal
 
 from .datatypes import VarInt, UnsignedShort
 from .state import State
-from typing import Literal
-import json
 
 
 @dataclass
