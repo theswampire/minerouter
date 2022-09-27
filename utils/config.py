@@ -1,4 +1,5 @@
 import argparse
+import json
 from pathlib import Path
 from typing import Dict, Tuple, Any, TypedDict
 
@@ -12,16 +13,21 @@ class Singleton:
         return cls.instance
 
 
+UpstreamConfig = Dict[str, Tuple[str, int]]
+
+
 class ConfigData(TypedDict):
-    upstream_config: Dict[str, Tuple[str, int]]
+    upstream_config: UpstreamConfig
     system_config: Dict[str, Any]
 
 
 class Config(Singleton):
     config: ConfigData | None = None
 
-    def __init__(self, config: ConfigData):
-        Config.config = config
+    def __init__(self, file_config: ConfigData, cli_config: UpstreamConfig):
+        config = file_config
+        config["upstream_config"] = {**file_config.get("upstream_config", {}), **cli_config}
+        type(self).config = config
 
     @classmethod
     def get_addr(cls, *args, **kwargs) -> Any:
@@ -34,6 +40,15 @@ class Config(Singleton):
         if cls.config is None:
             raise ValueError("Config is not initialized")
         return cls.config['system_config'].get(*args, **kwargs)
+
+    def __str__(self):
+        return f"Config({self.config})"
+
+    def __repr__(self):
+        return self.__str__()
+
+
+EmptyConfigData: ConfigData = {"upstream_config": {}, "system_config": {}}
 
 
 def parse_args():
@@ -57,3 +72,19 @@ class ChooseType:
         if value.isdigit():
             return int(value)
         return value
+
+
+def load_config_file(path: Path) -> ConfigData:
+    if not path.exists():
+        return EmptyConfigData
+    with open(path, "r", encoding="UTF-8") as f:
+        data = json.load(f)
+
+    if not data:
+        return EmptyConfigData
+    if "upstream_config" not in data:
+        return EmptyConfigData
+
+    data["upstream_config"] = {domain: tuple(addr) for domain, addr in data["upstream_config"].items()}
+
+    return data

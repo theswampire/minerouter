@@ -1,22 +1,19 @@
 from tcpserver.server import MineRouterServer
-from utils.config import Config, parse_args
+from utils.config import Config, parse_args, load_config_file, EmptyConfigData
+from utils.logs import get_logger
+
+log = get_logger(__name__)
 
 
 def main():
     args = parse_args()
-    print(args)
 
-    Config(config={
-        "upstream_config": {
-            "127.0.0.1": ("127.0.0.1", 25569),
-            "localhost": ("127.0.0.1", 25570),
-            **{domain: tuple(addr) for domain, *addr in args.server}
-        },
-        'system_config': {
-            "COMPLETE_PACKETS": False
-        }
-    })
-    print(Config.config)
+    cli_conf = {
+        domain: tuple(addr) for domain, *addr in args.server
+    } if args.server else EmptyConfigData["upstream_config"]
+
+    Config(file_config=load_config_file(args.config), cli_config=cli_conf)
+    log.debug(Config.instance)
 
     with MineRouterServer(args.host, args.port) as mc:
         mc.serve_forever()
