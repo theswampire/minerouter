@@ -61,7 +61,8 @@ def parse_args():
     parser.add_argument("-s", "--server", nargs=3, metavar=("DOMAIN", "IP", "PORT"), action="append", default=None,
                         type=ChooseType,
                         help="Define your upstream servers using the CLI: '-s <server-domain> <upstream-ip> "
-                             "<upstream-port>'. ex: '-s mc2.example.com 10.0.8.2 25565'. Note: Overrides config-file")
+                             "<upstream-port>'. ex: '-s mc2.example.com 10.0.8.2 25565'. Note: Use it multiple times "
+                             "to define more servers. Overrides config-file")
     return parser.parse_args()
 
 
