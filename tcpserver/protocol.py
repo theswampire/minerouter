@@ -180,7 +180,12 @@ class Protocol:
                 match e.errno:
                     # OSError: [Errno 113] Host is unreachable
                     case 113:
-                        log.debug(f"{messenger.target.capitalize()} unreachable: {messenger.addr} for {self.server_name}")
+                        target = messenger.target.capitalize()
+                        msg = f"{target} unreachable: {messenger.addr} for {self.server_name}"
+                        if target == "Server":
+                            log.warning(msg)
+                        else:
+                            log.debug(msg)
                         self.close()
                         return
             log.warning((self.server_name, e))
