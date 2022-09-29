@@ -34,7 +34,7 @@ class Config(Singleton):
     def get_addr(cls, key: Any, default: Any | None = None) -> Any:
         if cls.config is None:
             raise ValueError("Config not initialized")
-        return cls.config["upstream_config"].get(key, default=default)
+        return cls.config["upstream_config"].get(key, default)
 
     @classmethod
     def get_system_conf(cls, key: Any, default: Any | None = None) -> Any:
@@ -42,7 +42,7 @@ class Config(Singleton):
             raise ValueError("Config is not initialized")
         if "system_config" not in cls.config:
             return default
-        return cls.config['system_config'].get(key, default=default)
+        return cls.config['system_config'].get(key, default)
 
     def __str__(self):
         return f"Config({self.config})"

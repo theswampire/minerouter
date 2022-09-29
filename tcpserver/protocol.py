@@ -187,7 +187,11 @@ class Protocol:
         decoded_packet = HandshakePacket.new(packet)
         log.debug(f"{self.id}: {decoded_packet}")
 
-        self.create_server_connection(host=decoded_packet.server_addr)
+        try:
+            self.create_server_connection(host=decoded_packet.server_addr)
+        except ValueError:
+            self.close()
+
         self.pipe_to_server(packet)
 
         self.state = decoded_packet.next_state
@@ -196,6 +200,7 @@ class Protocol:
         self.server_name = host
         addr = Config.get_addr(host, None)
         if addr is None:
+            log.debug(f"{host} is not configured")
             raise ValueError(f"{host} is not configured")
 
         log.debug(f"{self.id}: Creating Upstream Connection to {addr=} for {host=}")
