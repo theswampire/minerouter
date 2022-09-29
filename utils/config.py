@@ -31,16 +31,18 @@ class Config(Singleton):
         type(self).config = config
 
     @classmethod
-    def get_addr(cls, *args, **kwargs) -> Any:
+    def get_addr(cls, key: Any, default: Any | None = None) -> Any:
         if cls.config is None:
             raise ValueError("Config not initialized")
-        return cls.config["upstream_config"].get(*args, **kwargs)
+        return cls.config["upstream_config"].get(key, default=default)
 
     @classmethod
-    def get_system_conf(cls, *args, **kwargs) -> Any:
+    def get_system_conf(cls, key: Any, default: Any | None = None) -> Any:
         if cls.config is None:
             raise ValueError("Config is not initialized")
-        return cls.config['system_config'].get(*args, **kwargs)
+        if "system_config" not in cls.config:
+            return default
+        return cls.config['system_config'].get(key, default=default)
 
     def __str__(self):
         return f"Config({self.config})"
