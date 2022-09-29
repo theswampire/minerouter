@@ -1,3 +1,4 @@
+import platform
 import selectors
 import socket
 import time
@@ -159,17 +160,19 @@ class Protocol:
             # self.notify_server_down()
             self.close()
         except OSError as e:
-            match e.winerror:
-                case 10057:
-                    # [WinError 10057]
-                    # if e.winerror == 10057:
-                    log.warning(f"Server Down: {self.server_name} {messenger.addr}")
-                    # self.notify_server_down()
-                    self.close()
-                    return
-                case 10038:
-                    # [WinError 10038]
-                    return
+            log.debug(e)
+            if platform.system() == "Windows":
+                match e.winerror:
+                    case 10057:
+                        # [WinError 10057]
+                        # if e.winerror == 10057:
+                        log.warning(f"Server Down: {self.server_name} {messenger.addr}")
+                        # self.notify_server_down()
+                        self.close()
+                        return
+                    case 10038:
+                        # [WinError 10038]
+                        return
             raise
 
     def process_protocol(self):
@@ -187,21 +190,21 @@ class Protocol:
         decoded_packet = HandshakePacket.new(packet)
         log.debug(f"{self.id}: {decoded_packet}")
 
-        try:
-            self.create_server_connection(host=decoded_packet.server_addr)
-        except ValueError:
+        success = self.create_server_connection(host=decoded_packet.server_addr)
+        if not success:
             self.close()
+            return
 
         self.pipe_to_server(packet)
 
         self.state = decoded_packet.next_state
 
-    def create_server_connection(self, host: str):
+    def create_server_connection(self, host: str) -> bool:
         self.server_name = host
         addr = Config.get_addr(host, None)
         if addr is None:
-            log.debug(f"{host} is not configured")
-            raise ValueError(f"{host} is not configured")
+            log.debug(f"{host=} is not configured")
+            return False
 
         log.debug(f"{self.id}: Creating Upstream Connection to {addr=} for {host=}")
 
@@ -214,6 +217,7 @@ class Protocol:
         self.selector.register(fileobj=sock, events=events, data=data)
 
         self.server_messenger = Messenger(sock=sock, addr=addr, selector=self.selector)
+        return True
 
     def pipe_to_client(self, data: bytes):
         self.client_messenger.write_packet(data)
