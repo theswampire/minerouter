@@ -4,7 +4,7 @@ import socket
 import time
 import uuid
 from types import SimpleNamespace
-from typing import Tuple
+from typing import Tuple, Literal
 
 from protocol import State, VarInt, HandshakePacket, DisconnectPacket
 from utils.config import Config
@@ -14,6 +14,7 @@ log = get_logger(__name__)
 
 
 class Messenger:
+    target: Literal["client", "server"]
     sock: socket.socket
     addr: Tuple[str, int]
     selector: selectors.DefaultSelector
@@ -24,7 +25,9 @@ class Messenger:
     packet_length: int | None = None
     packet_read_complete: bool = False
 
-    def __init__(self, sock: socket.socket, selector: selectors.DefaultSelector, addr: Tuple[str, int]):
+    def __init__(self, sock: socket.socket, selector: selectors.DefaultSelector, addr: Tuple[str, int],
+                 target: Literal["client", "server"]):
+        self.target = target
         self._last_read = time.time()
 
         self.sock = sock
@@ -133,7 +136,7 @@ class Protocol:
         self.id = uuid.uuid1()
         log.debug(f"New Protocol Bridge: {self.id} for {addr=}")
         self.selector = selector
-        self.client_messenger = Messenger(sock=client, addr=addr, selector=selector)
+        self.client_messenger = Messenger(sock=client, addr=addr, selector=selector, target="client")
 
         self.use_read_packets = Config.get_system_conf("COMPLETE_PACKETS", False)
         if self.use_read_packets:
@@ -160,19 +163,27 @@ class Protocol:
             # self.notify_server_down()
             self.close()
         except OSError as e:
-            log.debug(self.server_name,e)
-            if platform.system() == "Windows":
+
+            sys_name = platform.system()
+            if sys_name == "Windows":
                 match e.winerror:
                     case 10057:
                         # [WinError 10057]
-                        # if e.winerror == 10057:
-                        log.warning(f"Server Down: {self.server_name} {messenger.addr}")
+                        log.warning(f"{messenger.target.capitalize()} Down: {messenger.addr} for {self.server_name}")
                         # self.notify_server_down()
                         self.close()
                         return
                     case 10038:
                         # [WinError 10038]
                         return
+            elif sys_name == "Linux":
+                match e.errno:
+                    # OSError: [Errno 113] Host is unreachable
+                    case 113:
+                        log.debug(f"{messenger.target.capitalize()} unreachable: {messenger.addr} for {self.server_name}")
+                        self.close()
+                        return
+            log.warning((self.server_name, e))
             raise
 
     def process_protocol(self):
@@ -210,13 +221,17 @@ class Protocol:
 
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         sock.setblocking(False)
-        sock.connect_ex(addr)
+        try:
+            sock.connect_ex(addr)
+        except socket.gaierror:
+            log.warning(f"Failed to resolve upstream address for {host=}: {addr=}")
+            return False
 
         data = SimpleNamespace(target="server", proto=self)
         events = selectors.EVENT_READ | selectors.EVENT_WRITE
         self.selector.register(fileobj=sock, events=events, data=data)
 
-        self.server_messenger = Messenger(sock=sock, addr=addr, selector=self.selector)
+        self.server_messenger = Messenger(sock=sock, addr=addr, selector=self.selector, target="server")
         return True
 
     def pipe_to_client(self, data: bytes):
