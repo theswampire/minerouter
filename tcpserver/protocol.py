@@ -160,7 +160,7 @@ class Protocol:
             # self.notify_server_down()
             self.close()
         except OSError as e:
-            log.debug(e)
+            log.debug(self.server_name,e)
             if platform.system() == "Windows":
                 match e.winerror:
                     case 10057:
