@@ -17,7 +17,7 @@ You can configure following aspects:
 - Upstream Servers: 
   - Domain/IP String to identify the origin server. It uses the server address field of the [handshake](https://wiki.vg/Protocol#Handshaking) packet.
   - Actual address of the origin server.
-- experimental Features
+- Experimental Features
   - "COMPLETE_PACKETS": Read entire Minecraft-Packets before passing it further.
 
 #### Commandline Interface
@@ -31,14 +31,10 @@ Create a file named `config.json` in the same directory as the `minerouter` dire
 ```json
 {
   "upstream_config": {
-    "mc1.example.com": [
-      "10.0.1.1",
-      25565
-    ],
-    "mc2.example.com": [
-      "10.0.1.2",
-      25565
-    ]
+    "mc1.example.com": "11.1.11.1",
+    "mc2.example.com": "12.1.1.1:6969",
+    "mc3.example.com": "[::1]:26",
+    "mc4.example.com": "backend_server_domain"
   },
   # Optional
   "system_config": {
@@ -46,4 +42,6 @@ Create a file named `config.json` in the same directory as the `minerouter` dire
   }
 }
 ```
+Note that if you provide an IPv6 address, use the bracket notation like `mc4.example.com`.
+
 If you prefer storing your config in another location, you can specify a path to your configuration file with the `--config` argument.

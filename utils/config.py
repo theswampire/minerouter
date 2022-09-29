@@ -2,6 +2,7 @@ import argparse
 import json
 from pathlib import Path
 from typing import Dict, Tuple, Any, TypedDict
+from urllib.parse import urlparse
 
 
 class Singleton:
@@ -86,6 +87,12 @@ def load_config_file(path: Path) -> ConfigData:
     if "upstream_config" not in data:
         return EmptyConfigData
 
-    data["upstream_config"] = {domain: tuple(addr) for domain, addr in data["upstream_config"].items()}
+    data["upstream_config"] = {domain: _split_addr(addr) for domain, addr in data["upstream_config"].items()}
 
     return data
+
+
+def _split_addr(addr: str) -> Tuple[str, int]:
+    url = urlparse(f"//{addr}")
+    return url.hostname, url.port or 25565
+
