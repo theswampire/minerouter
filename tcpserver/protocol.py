@@ -7,6 +7,7 @@ from types import SimpleNamespace
 from typing import Tuple, Literal
 
 from protocol import State, VarInt, HandshakePacket, DisconnectPacket
+from protocol.state import InvalidStateError
 from utils.config import Config
 from utils.logs import get_logger
 
@@ -68,7 +69,7 @@ class Messenger:
         if len(self.recv_buffer) > 0:
             try:
                 value, n = VarInt.decode(self.recv_buffer)
-            except ValueError:
+            except (ValueError, IndexError):
                 return
             else:
                 self.packet_length = value + n
@@ -203,7 +204,13 @@ class Protocol:
         if packet is None:
             return
 
-        decoded_packet = HandshakePacket.new(packet)
+        try:
+            decoded_packet = HandshakePacket.new(packet)
+        except InvalidStateError as e:
+            log.debug(e)
+            self.close()
+            return
+
         log.debug(f"{self.id}: {decoded_packet}")
 
         success = self.create_server_connection(host=decoded_packet.server_addr)

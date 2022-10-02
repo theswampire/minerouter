@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from typing import Literal
 
 from .datatypes import VarInt, UnsignedShort
-from .state import State
+from .state import State, InvalidStateError
 
 
 @dataclass
@@ -58,7 +58,10 @@ class HandshakePacket(UncompressedPacket):
 
         next_state, n = VarInt.decode(data[index:])
         index += n
-        next_state = State(next_state)
+        try:
+            next_state = State(next_state)
+        except ValueError:
+            raise InvalidStateError(state=next_state)
         return protocol_version, server_addr, server_port, next_state
 
     @classmethod
