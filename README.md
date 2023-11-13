@@ -21,7 +21,7 @@ You can configure following aspects:
   - "COMPLETE_PACKETS": Read entire Minecraft-Packets before passing it further.
 
 #### Commandline Interface
-There are CLI options which you can look it up with `-h` or `--help`:
+There are CLI options which you can look up with `-h` or `--help`:
 ```commandline
 $ python minerouter -h
 ```
